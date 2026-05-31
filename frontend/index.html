@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Chat Widget CERDAS</title>
+    <style>
+        #chat-widget { position: fixed; bottom: 20px; right: 20px; width: 300px; border: 1px solid #ccc; background: white; padding: 10px; border-radius: 8px; }
+        #chat-box { height: 200px; overflow-y: scroll; border: 1px solid #eee; margin-bottom: 10px; padding: 5px; }
+    </style>
+</head>
+<body>
+    <div id="chat-widget">
+        <div id="chat-box"></div>
+        <input type="text" id="user-input" placeholder="Tanya CERDAS...">
+        <button onclick="sendMessage()">Kirim</button>
+    </div>
+    <script>
+        async function sendMessage() {
+            const input = document.getElementById('user-input');
+            const chatBox = document.getElementById('chat-box');
+            const query = input.value;
+            chatBox.innerHTML += '<p><b>Anda:</b> ' + query + '</p>';
+            
+            const response = await fetch('http://127.0.0.1:8000/chat', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({query: query})
+            });
+            const data = await response.json();
+            chatBox.innerHTML += '<p><b>CERDAS:</b> ' + data.response + '</p>';
+            input.value = '';
+        }
+    </script>
+</body>
+</html>
