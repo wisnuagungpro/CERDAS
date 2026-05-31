@@ -3,25 +3,32 @@ from langgraph.checkpoint.memory import MemorySaver
 from typing import TypedDict, List, Annotated
 import operator
 from langchain_chroma import Chroma
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
+from langchain_core.messages import HumanMessage, SystemMessage
 
-# Inisialisasi Vector Store
+# Inisialisasi
 embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash-8b")
 vectorstore = Chroma(persist_directory="./data/db", embedding_function=embeddings)
 
 class AgentState(TypedDict):
     messages: Annotated[List[str], operator.add]
-    current_step: str
+    context: str
 
 def router_node(state: AgentState):
     return "retrieval"
 
 def retrieval_node(state: AgentState):
     query = state['messages'][-1]
-    # Mencari 2 dokumen paling relevan
+    # Retrieval
     results = vectorstore.similarity_search(query, k=2)
     content = "\n".join([doc.page_content for doc in results]) if results else "Informasi tidak ditemukan."
-    return {"messages": [f"Hasil pencarian dokumen: {content}"], "current_step": "retrieval"}
+    
+    # Generation
+    prompt = f"Anda adalah asisten ramah Kabupaten Semarang. Jawab pertanyaan berdasarkan dokumen berikut:\n{content}\n\nPertanyaan: {query}"
+    response = llm.invoke([SystemMessage(content="Jawab dengan bahasa yang sopan."), HumanMessage(content=prompt)])
+    
+    return {"messages": [response.content], "context": content}
 
 workflow = StateGraph(AgentState)
 workflow.add_node("router", router_node)
