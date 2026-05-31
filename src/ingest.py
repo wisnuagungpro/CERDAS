@@ -1,5 +1,5 @@
 import os
-from langchain_community.document_loaders import TextLoader
+from langchain_community.document_loaders import PyPDFLoader
 from langchain_chroma import Chroma
 from langchain_text_splitters import CharacterTextSplitter
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
@@ -7,20 +7,23 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-def ingest_documents():
-    print("Ingesting documents...")
-    # Load document
-    loader = TextLoader("data/pdfs/panduan.txt")
-    documents = loader.load()
-    
-    # Split document
-    text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
-    docs = text_splitter.split_documents(documents)
-    
-    # Embedding & Vector Store
+def ingest_pdfs():
+    print("Ingesting PDF documents...")
     embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
-    db = Chroma.from_documents(docs, embeddings, persist_directory="./data/db")
-    print(f"Ingested {len(docs)} documents into ChromaDB.")
+    pdf_dir = "data/pdfs_source"
+    
+    all_docs = []
+    for filename in os.listdir(pdf_dir):
+        if filename.endswith(".pdf"):
+            loader = PyPDFLoader(os.path.join(pdf_dir, filename))
+            all_docs.extend(loader.load())
+            
+    text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+    docs = text_splitter.split_documents(all_docs)
+    
+    # Simpan ke ChromaDB
+    Chroma.from_documents(docs, embeddings, persist_directory="./data/db")
+    print(f"Successfully processed {len(docs)} chunks from PDFs.")
 
 if __name__ == "__main__":
-    ingest_documents()
+    ingest_pdfs()
