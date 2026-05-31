@@ -4,7 +4,7 @@ from typing import TypedDict, List, Annotated
 import operator
 from langchain_chroma import Chroma
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage, BaseMessage
 
 # Inisialisasi
 embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
@@ -12,23 +12,23 @@ llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash-8b")
 vectorstore = Chroma(persist_directory="./data/db", embedding_function=embeddings)
 
 class AgentState(TypedDict):
-    messages: Annotated[List[str], operator.add]
-    context: str
+    messages: Annotated[List[BaseMessage], operator.add]
 
 def router_node(state: AgentState):
     return "retrieval"
 
 def retrieval_node(state: AgentState):
-    query = state['messages'][-1]
+    query = state['messages'][-1].content
     # Retrieval
     results = vectorstore.similarity_search(query, k=2)
     content = "\n".join([doc.page_content for doc in results]) if results else "Informasi tidak ditemukan."
     
-    # Generation
-    prompt = f"Anda adalah asisten ramah Kabupaten Semarang. Jawab pertanyaan berdasarkan dokumen berikut:\n{content}\n\nPertanyaan: {query}"
-    response = llm.invoke([SystemMessage(content="Jawab dengan bahasa yang sopan."), HumanMessage(content=prompt)])
+    # Generation dengan Memory (mengirim seluruh history pesan)
+    messages = [SystemMessage(content="Anda adalah asisten ramah Kabupaten Semarang. Gunakan riwayat percakapan berikut untuk memberikan jawaban kontekstual.")] + state['messages']
     
-    return {"messages": [response.content], "context": content}
+    response = llm.invoke(messages)
+    
+    return {"messages": [response]}
 
 workflow = StateGraph(AgentState)
 workflow.add_node("router", router_node)
